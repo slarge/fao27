@@ -1,15 +1,14 @@
 ---
-title: "Title Goes Here"
+title: "FAO Area 27 - Stock Status"
 author:
-  - author 1
-  - author 2
+  - Scott I. Large
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
     bookdown::html_document2:
     fig_caption: yes
     reference_docx: templates/template.docx
 bibliography: references.bib
-csl: journal-of-archaeological-science.csl
+csl: ices_jms.csl
 abstract: |
   Text of abstract
 keywords: |
@@ -30,38 +29,43 @@ knitr::opts_chunk$set(
   comment = "#>",
   fig.path = "../figures/"
 )
-
-library(fao27)
 ```
 
-# Introduction
+# General Description {-}
+1.	Review fish landings and their trends from Area 27  
+2.	Assess stock status of the species that are listed in [Table D2](http://www.fao.org/docrep/015/i2389e/i2389e.pdf#page=313) in FAO Technical Paper 569 using FAO method described in the Appendix--Assessment Method in FAO Technical Paper 569 @FAO2017.  
+3.	Stock status must be classified in three categories together with the scores of uncertainty.  
+4.	Provide justification for the stock status given and report any significant changes in associated fisheries or ecosystems.  
+5.	Fill out the template from FAO for the assessed stocks/species  
 
-Here is a citation [@Marwick2017]
+The main output of will be an Excel table showing stock status and uncertainty scores of the species listed in Table D2 plus some description on the major changes over the last two years in stock status or associated fisheries or ecosystems.
 
-# Background
+# Reference point mapping decisions {-}
+FAO allows assessments made by ICES to be adopted, however, the classification of stock status should follow the criteria listed in [Table 1](http://www.fao.org/docrep/015/i2389e/i2389e.pdf#page=347) if an estimate of current biomass of a stock relative to BMSY is available. ICES does not estimate BMSY 
 
-```{r demo, eval = FALSE}
-1 + 1
-```
+>"SSB<sub>MSY</sub> (or B<sub>MSY</sub> as it is more commonly called) is not a metric derived from a framework of protecting reproductive capacity, but rather from a framework of maximizing the catch (yield). Within the ICES advice framework, it is the precautionary reference points (conservation) that are used to ensure the reproductive capacity of the stock (Bpa), whilst the MSY approach creates reference points to achieve maximum long-term sustainable harvest of fish stocks." [ICES, 2015](https://www.ices.dk/sites/pub/Publication%20Reports/Advice/2015/Special_Requests/EU_Technical_service_clarification_MSFD_review.pdf)
 
-# Methods
+ICES reference points are divided into Precautionary (PA) and maximum sustainable yield (MSY) reference points [ICES, 2017](http://ices.dk/sites/pub/Publication%20Reports/Advice/2017/2017/12.04.03.01_Reference_points_for_category_1_and_2.pdf).
 
-# Results
+* B<sub>lim</sub>: A deterministic biomass limit below which a stock is considered to have reduced reproductive capacity.
+* B<sub>pa</sub>: A stock status reference point above which the stock is considered to have full reproductive capacity, having accounted for estimation uncertainty.  
+* MSY B<sub>trigger</sub>: A lower bound to the SSB when the stock is fished at F<sub>MSY</sub>
 
-```{r get-data, eval = FALSE}
-# Note the path that we need to use to access our data files when rendering this document
-my_data <- readr::read_csv("../data/raw_data/my_csv_file.csv")
-```
+* F<sub>lim</sub>: Exploitation rate which leads SSB to B<sub>lim</sub>.
+* F<sub>pa</sub>: An exploitation rate reference point below which exploitation is considered to be sustainable, having accounted for estimation uncertainty.
+* F<sub>MSY</sub>: The F expected to give maximum sustainable yield in the long term.
 
-# Discussion
+FAO characterization of stock status (i.e., as overexploited, fully exploited, and non-fully exploited) is complementary, but not fully aligned with the ICES approach. FAO criteria for classificiation of fish stocks also includes "spawning potential" and "size/age composition", which are both considered within the calculation of ICES reference points.
 
-# Conclusion
+* Overexploited: Stock size is believed to have a reduced reproductive capacity based on the exploitation rate
+    - Stock size: SSB &lt; B<sub>lim</sub>
+    - Fishing pressure: F &lt; F<sub>lim</sub>
+* Fully exploited: Stock size is considered to have full reproductive capacity based on the exploitation rate 
+    - Stock size: SSB &gt; B<sub>pa</sub>
+    - Fishing pressure: F &lt; F<sub>pa</sub>
+* Non-fully exploited: Not generalizable given ICES reference points. Should be determined on a case-by-case basis if F<< F<sub>MSY</sub> and SSB >> MSY B<sub>trigger</sub>.
 
-# Acknowledgements
-
-# References 
-
-### Colophon
+### Colophon {-}
 
 This report was generated on `r Sys.time()` using the following computational environment and dependencies: 
 
