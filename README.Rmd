@@ -16,13 +16,15 @@ knitr::opts_chunk$set(
 
 # fao27
 
-The goal of fao27 is to ...
+The goal of fao27 is to document the process for the "Review of the state of the world marine fishery resources" for FAO Area 27.
+
+_created_ with [rrtools](https://github.com/benmarwick/rrtools)
 
 ### Citation
 
 Please cite this compendium as:
 
-> Authors, (`r format(Sys.Date(), "%Y")`). _Title of compendium_. Accessed `r format(Sys.Date(), "%d %b %Y")`. Online at <https://doi.org/xxx/xxx>
+> Large, SI (`r format(Sys.Date(), "%Y")`). _fao27_. Accessed `r format(Sys.Date(), "%d %b %Y")`. Online at <https://doi.org/xxx/xxx>
 
 ### Licenses
 

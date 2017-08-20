@@ -1,10 +1,17 @@
 Package: fao27
-Title: What the Package Does (one line, title case)
+Title: FAO SOFIA Assessment for FAO Area 27
 Version: 0.0.0.9000
-Authors@R: person("First", "Last", email = "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Authors@R: person("Scott", "Large", email = "scott.large@ices.dk", role = c("aut", "cre"))
+Description: This package aggregates and reorganizes ICES stock assessment output into the FAO SOFIA format.
 Depends: R (>= 3.4.1)
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-Imports: bookdown
+Imports: bookdown,
+         dplyr,
+         tidyr
+Suggests: testthat,
+          RcppRoll,
+          icesSAG,
+          purrr
+RoxygenNote: 6.0.1

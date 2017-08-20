@@ -2,13 +2,15 @@
 fao27
 =====
 
-The goal of fao27 is to ...
+The goal of fao27 is to document the process for the "Review of the state of the world marine fishery resources" for FAO Area 27.
+
+*created* with [rrtools](https://github.com/benmarwick/rrtools)
 
 ### Citation
 
 Please cite this compendium as:
 
-> Authors, (2017). *Title of compendium*. Accessed 10 Aug 2017. Online at <https://doi.org/xxx/xxx>
+> Large, SI (2017). *fao27*. Accessed 10 Aug 2017. Online at <https://doi.org/xxx/xxx>
 
 ### Licenses
 
