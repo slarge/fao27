@@ -1,22 +1,7 @@
-rm(list = ls())
-library(RcppRoll)
-library(dplyr)
-library(icesSAG)
-
-reference_vals <- function(assessmentKey){
-  ref_tab <- icesSAG::getFishStockReferencePoints(assessmentKey = assessmentKey)[[1]] %>%
-    select(AssessmentYear, Fpa, Bpa, FLim, Blim, FMSY,
-           MSYBtrigger)
-  return(ref_tab)
-}
-
-summary_vals <- function(assessmentKey){
-  sum_tab <- icesSAG::getSummaryTable(assessmentKey = assessmentKey)[[1]] %>%
-    select(Year, low_SSB, high_SSB, SSB, catches, landings, discards, low_F, F, high_F,
-           fishstock, AssessmentYear)
-  return(sum_tab)
-}
-
+# rm(list = ls())
+# library(RcppRoll)
+# library(dplyr)
+# library(icesSAG)
 
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ##
 ## Establish the year of the assessment and tidy up some ICES issues ##
@@ -24,6 +9,9 @@ summary_vals <- function(assessmentKey){
 
 data("stock_list_raw")
 data("species_list_raw")
+data("sag_keys_raw")
+
+active_year <- 2017
 
 stock_list <- stock_list_raw %>%
   filter(ActiveYear == 2017,
@@ -64,32 +52,36 @@ species_list_raw$ISSCAAP <- as.character(species_list_raw$ISSCAAP)
 ## Link FAO and ICES ##
 ## ~~~~~~~~~~~~~~~~~ ##
 
+## These are the ICES stocks that have the ISSCAAP requested (not the "SP group other")
 ices_data <- target_species %>%
-  filter(!grepl("-", English_name),
-         !grepl("*ther", English_name)) %>%
+  filter(!grepl("-", English_name), # remove "total" column
+         !grepl("*ther", English_name)) %>% # remove "other" column
   select(1:3) %>%
   distinct(.keep_all = TRUE) %>%
   left_join(species_list_raw, by = c("English_name", "Scientific_name", "ISSCAAP")) %>%
   left_join(stock_list, by = c("X3A_CODE" = "SpeciesID" ))
 
+## These are ISSCAAP groups that we have
 other_species <- d2 %>%
-  filter(grepl("Total", ISSCAAP)) %>%
-  mutate(ISSCAAP = as.numeric(gsub(" Total", "", ISSCAAP))) %>%
+  filter(grepl("Other", English_name)) %>%
+  # mutate(ISSCAAP = as.numeric(gsub(" Total", "", ISSCAAP))) %>%
   tidyr::gather(key = YEAR, value = landings, -English_name, -Scientific_name, -countries, -ISSCAAP) %>%
   select(1) %>%
   distinct(.keep_all = TRUE)
 
+## These are the ICES stocks in the "other sp group columns"
 other_data <- species_list_raw %>%
   filter(ISSCAAP %in% other_species$ISSCAAP) %>%
   left_join(stock_list, by = c("X3A_CODE" = "SpeciesID")) %>%
   filter(!is.na(StockKeyLabel),
-         !StockKeyLabel %in% ices_data$StockKeyLabel) %>%
-  mutate(ISSCAAP = paste0(ISSCAAP, " Total"))
+         !StockKeyLabel %in% ices_data$StockKeyLabel) #%>%
+  # mutate(ISSCAAP = paste0(ISSCAAP, " Total"))
 
 ## ~~~~~~~~~~~~~~~~~~~~ ##
 ## Start the assessment ##
 ## ~~~~~~~~~~~~~~~~~~~~ ##
 
+## Merge the ICES and other data and modify the assessment types
 all_data <- bind_rows(ices_data,
                       other_data) %>%
   mutate(DataCategory = floor(as.numeric(DataCategory)),
@@ -99,7 +91,7 @@ all_data <- bind_rows(ices_data,
                                            grepl("Age|age", AssessmentType) ~ 2, #empirically-based for trends;
                                          DataCategory == 3 &
                                            !grepl("Age|age", AssessmentType) ~ 3, #empirically-based;
-                                         DataCategory == 4~ 4, #others;
+                                         DataCategory == 4 ~ 4, #others;
                                          DataCategory > 4 ~ 5, #Not Available
                                          TRUE ~ 5)
   ) %>%
@@ -118,7 +110,7 @@ all_data <- bind_rows(ices_data,
          AdviceCategory,
          AssessmentKey)
 
-# These stocks don't have assessment keys - get them from earlier advice
+## These stocks don't have 2017 assessment keys - get them from earlier advice
 odds <- all_data %>%
   filter(is.na(AssessmentKey),
          !is.na(StockKeyLabel),
@@ -128,15 +120,39 @@ odds_key <- sag_keys_raw %>%
   filter(StockKeyLabel %in% odds$PreviousStockKeyLabel) %>%
   group_by(StockKeyLabel) %>%
   filter(AssessmentYear == max(AssessmentYear),
-         !is.na(StockKeyLabel))
+         !is.na(StockKeyLabel)) %>%
+  rename(AssessmentKey_new = AssessmentKey,
+         AssessmentYear_new = AssessmentYear,
+         PreviousStockKeyLabel = StockKeyLabel)
 
-all_data$AssessmentKey[all_data$PreviousStockKeyLabel %in% odds_key$StockKeyLabel] <- odds_key$AssessmentKey
-all_data$YearOfLastAssessment[all_data$PreviousStockKeyLabel %in% odds_key$StockKeyLabel] <- odds_key$AssessmentYear
+all_data <- all_data %>%
+  left_join(odds_key, by = "PreviousStockKeyLabel") %>%
+  mutate(YearOfLastAssessment = ifelse(is.na(AssessmentYear_new),
+                                       YearOfLastAssessment,
+                                       AssessmentYear_new),
+         AssessmentKey = ifelse(is.na(AssessmentKey_new),
+                                AssessmentKey,
+                                AssessmentKey_new),
+         url_name = ifelse(is.na(AssessmentYear_new),
+                                StockKeyLabel,
+                                PreviousStockKeyLabel),
+         URL = sprintf("\"%s%i/%i/%s.pdf\"",
+                       "http://ices.dk/sites/pub/Publication%20Reports/Advice/",
+                       YearOfLastAssessment,
+                       YearOfLastAssessment,
+                       url_name),
+         URL = ifelse(is.na(AssessmentKey),
+                      NA,
+                      URL)) %>%
+  select(-AssessmentYear_new,
+         -AssessmentKey_new,
+         -url_name)
 
 ## ~~~~~~~~~~~~~~~~~~~~ ##
 ## Get reference points ##
 ## ~~~~~~~~~~~~~~~~~~~~ ##
 
+## When we have assessment keys, get the reference point data
 ices_refpts <- bind_rows(all_data %>%
                            filter(is.na(AssessmentKey)),
                          all_data %>%
@@ -150,6 +166,7 @@ ices_refpts <- bind_rows(all_data %>%
 ## Get stock summaries ##
 ## ~~~~~~~~~~~~~~~~~~~ ##
 
+## When we have assessment keys, get the summary data
 ices_status <- bind_rows(all_data %>%
                            filter(is.na(AssessmentKey)),
                          all_data %>%
@@ -158,22 +175,20 @@ ices_status <- bind_rows(all_data %>%
                            tidyr::unnest(summary_list)
 )
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ##
-## Map ICES reference points to FAO ##
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ##
+## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ##
+## Map ICES reference points and summary values to FAO ##
+## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ##
 
 ssb_status <- ices_status %>%
-  mutate(SSB = SSB/1000,
-         high_SSB = high_SSB/1000,
-         low_SSB = low_SSB/1000) %>%
   group_by(StockKeyLabel) %>%
   arrange(Year) %>%
   do(tail(., n = 5)) %>%
   mutate(SSBavg = mean(SSB, na.rm = TRUE)) %>%
   filter(Year == YearOfLastAssessment) %>%
-  left_join(sag_refpts_raw, by = c("StockKeyLabel", "AssessmentKey", "AssessmentYear")) %>%
-  mutate(Blim = Blim/1000,
-         Bpa = Bpa/1000,
+  left_join(ices_refpts) %>%
+  # left_join(sag_refpts_raw, by = c("StockKeyLabel", "AssessmentKey", "AssessmentYear")) %>%
+  mutate(Blim = Blim,
+         Bpa = Bpa,
          SSBrefdesc = "ICES Precautionary Approach",
          SSBstatus = case_when(SSB > Blim ~ "F", # Fully exploited
                                SSB < Bpa ~ "O", # Over exploited
@@ -199,8 +214,6 @@ ssb_status <- ices_status %>%
          SSBrefdesc,
          SSBratio,
          SSBuncertainty,
-         # SSBratioH,
-         # SSBratioL,
          SSBstatus,
          SSByear = Year)
 
@@ -215,7 +228,8 @@ F_status <- ices_status %>%
                        NA,
                        mean(F, na.rm = TRUE))) %>%
   filter(Year == YearOfLastAssessment - 1) %>%
-  left_join(sag_refpts_raw, by = c("StockKeyLabel", "AssessmentKey", "AssessmentYear")) %>%
+  left_join(ices_refpts) %>%
+  # left_join(sag_refpts_raw, by = c("StockKeyLabel", "AssessmentKey", "AssessmentYear")) %>%
   mutate(Frefdesc = "ICES Precautionary Approach",
          Fstatus = case_when(F < FLim ~ "F", # Fully exploited
                                F > Fpa ~ "O", # Over exploited
@@ -237,13 +251,10 @@ F_status <- ices_status %>%
          Fratio = F/Frefpt) %>%
   select(StockKeyLabel,
          Fval = F,
-         Favg,
          Frefpt,
          Frefdesc,
          Fratio,
          Funcertainty,
-         FratioH,
-         FratioL,
          Fstatus,
          Fyear = Year)
 
@@ -261,9 +272,30 @@ E_status <- all_data %>%
          Eunit,
          Equal)
 
+cpue_status <- all_data %>%
+  mutate(`Current CPUE` = NA,
+         `Units of CPUE` = NA,
+         `CPUEinit` = NA,
+         `CPUEmax` = NA,
+         `CPUE/ CPUEinit` = NA,
+         `CPUE/ CPUEmax` = NA,
+         `Status` = NA,
+         `Year` = NA
+  ) %>%
+  select(StockKeyLabel,
+    `Current CPUE`,
+         `Units of CPUE`,
+         `CPUEinit`,
+         `CPUEmax`,
+         `CPUE/ CPUEinit`,
+         `CPUE/ CPUEmax`,
+         `Status`,
+         `Year`)
+
 C_status <- ices_status %>%
-  mutate(landings = landings/1000,
-         catches = catches/1000) %>%
+  mutate(catches = ifelse(AssessmentKey == 8376,
+                          NA,
+                          catches)) %>%
   group_by(StockKeyLabel) %>%
   arrange(Year) %>%
   mutate(Clen = length(catches[!is.na(catches)]),
@@ -293,14 +325,17 @@ C_status <- ices_status %>%
          Cratio = Cval/Cmax,
          Cstatus = case_when(Cratio <= 0.5 ~ "O",
                              Cratio > 0.5 ~ "F",
-                             TRUE ~ NA_character_)) %>%
+                             TRUE ~ NA_character_),
+         Cval = Cval,
+         Cavg = Cavg,
+         Cmax = Cmax) %>%
   select(StockKeyLabel,
          Cval,
-         Cavg,
          Cmax,
          Cratio,
          Cstatus,
-         Cyear = Year)
+         Cyear = Year,
+         URL)
 
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ##
 ## Create the nasty spreadsheet ##
@@ -336,13 +371,13 @@ all_status <- all_data %>%
          `Stock Assessment Type` = NA,
          `Stock Assessment method/software` = NA,
          `Overfished (Y/N)` = NA, # SSB relative to SSBref
-         `Overfishing (Y/N)` = NA) %>% # relative to Fref
+         `Overfishing (Y/N)` = NA) %>% # F relative to Fref
   select(`Individual stock` = StockKeyDescription,
          `Proportion of Total Landings`,
          `Stock Assessment Type` = StockAssessmentType,
          `Stock Assessment method/software` = AssessmentType,
          `Overfished (Y/N)`, # SSB relative to SSBref
-         `Overfishing (Y/N)`,
+         `Overfishing (Y/N)`, # F relative to Fref
          ISSCAAP,
          StockKeyLabel,
          English_name,
@@ -350,6 +385,7 @@ all_status <- all_data %>%
   left_join(ssb_status, by = "StockKeyLabel") %>%
   left_join(F_status, by = "StockKeyLabel") %>%
   left_join(E_status, by = "StockKeyLabel") %>%
+  left_join(cpue_status, by = "StockKeyLabel") %>%
   left_join(C_status, by = "StockKeyLabel") %>%
   mutate(`Overfished (Y/N)` = case_when(SSBratio < 1 ~ "Y",
                                         SSBratio >= 1 ~ "N",
@@ -364,13 +400,15 @@ final_table <- group_data %>%
   rename(`ISSCAAP group` = ISSCAAP,
          `Stock of species group` = English_name,
          `Scientific name` = Scientific_name)  %>%
-  mutate(group = "A") %>%
+  distinct(.keep_all = TRUE) %>%
+  mutate(group = "A",
+         `Proportion of Total Landings` = (Cval/ `Total Landings 1000s tons`) * 100) %>%
   tidyr::spread(`SOFIA ID`, value = group) %>%
   select(-StockKeyLabel) %>%
   arrange(`ISSCAAP group`)
 
+## remove the last, nasty column
 final_table[ncol(final_table)] <- NULL
-
 final_table <- t(final_table)
 
 write.csv(final_table, file = paste0("analysis/data/derived_data/", Sys.Date(), "_FAO-sofia-output.csv"), row.names = TRUE)
